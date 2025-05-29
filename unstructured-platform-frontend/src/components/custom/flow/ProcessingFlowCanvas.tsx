@@ -14,16 +14,14 @@ import ReactFlow, {
   NodeTypes,
   Position,
   MarkerType,
-  NodeMouseHandler,
-  ReactFlowInstance, // For onInit
   ReactFlowInstance,
-  Viewport, // Import Viewport type
+  Viewport,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import NodeConfigPanel from './NodeConfigPanel';
-import { useToast } from "@/components/ui/use-toast"; // Import useToast
+import { useToast } from "@/components/ui/use-toast";
 
 // Import custom nodes
 import InputNode from './nodes/InputNode';
@@ -33,8 +31,8 @@ import ChunkNode from './nodes/ChunkNode';
 import ExtractLLMNode from './nodes/ExtractLLMNode';
 import OutputNode from './nodes/OutputNode';
 
-let id = 0;
-const getId = () => `dndnode_${id++}`;
+let idCounter = 0; // Renamed from 'id' to avoid conflict
+const getId = () => `dndnode_${idCounter++}`;
 
 const initialNodes: Node[] = [
   {
@@ -56,7 +54,8 @@ const ProcessingFlowCanvas: React.FC = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
-  const { toast } = useToast(); // Initialize toast
+  const { toast } = useToast();
+  const [isExecutingFlow, setIsExecutingFlow] = useState<boolean>(false); // Loading state
 
   const FLOW_STATE_KEY = "processingFlowState";
 
@@ -99,11 +98,10 @@ const ProcessingFlowCanvas: React.FC = () => {
       setNodes((nds) =>
         nds.map((node) =>
           node.id === nodeId
-            ? { ...node, data: { ...node.data, ...newData } } // Merge new data with existing data
+            ? { ...node, data: { ...node.data, ...newData } } 
             : node
         )
       );
-      // If the currently selected node is the one being updated, refresh its state in the panel
       setSelectedNode((currentNode) => 
         currentNode && currentNode.id === nodeId 
           ? { ...currentNode, data: { ...currentNode.data, ...newData } } 
@@ -118,14 +116,122 @@ const ProcessingFlowCanvas: React.FC = () => {
       id: getId(),
       type,
       position: {
-        x: Math.random() * 400 + 100, // Random position for new nodes
+        x: Math.random() * 400 + 100,
         y: Math.random() * 200 + 50,
       },
-      data: { label },
+      data: { label }, 
       sourcePosition: Position.Right,
       targetPosition: Position.Left,
     };
     setNodes((nds) => nds.concat(newNode));
+  };
+
+  const saveFlowWrapper = () => {
+    if (!reactFlowInstance) {
+      toast({ title: "Error", description: "React Flow instance not available.", variant: "destructive" });
+      return;
+    }
+    const viewport = reactFlowInstance.getViewport();
+    const flowState = {
+      nodes: nodes, // Use current nodes from state
+      edges: edges, // Use current edges from state
+      viewport: viewport,
+    };
+    try {
+      localStorage.setItem(FLOW_STATE_KEY, JSON.stringify(flowState));
+      toast({ title: "Flow Saved", description: "Current flow state saved to local storage." });
+    } catch (error) {
+      console.error("Error saving flow to localStorage:", error);
+      toast({ title: "Error Saving Flow", description: "Could not save flow to local storage.", variant: "destructive" });
+    }
+  };
+
+  const loadFlowWrapper = () => {
+    try {
+      const storedFlow = localStorage.getItem(FLOW_STATE_KEY);
+      if (!storedFlow) {
+        toast({ title: "No Saved Flow", description: "No flow state found in local storage." });
+        return;
+      }
+      const parsedFlow = JSON.parse(storedFlow);
+      if (parsedFlow && parsedFlow.nodes && parsedFlow.edges && parsedFlow.viewport) {
+        setNodes(parsedFlow.nodes);
+        setEdges(parsedFlow.edges);
+        if (reactFlowInstance) {
+          reactFlowInstance.setViewport(parsedFlow.viewport);
+        }
+        toast({ title: "Flow Loaded", description: "Flow state restored from local storage." });
+      } else {
+        throw new Error("Invalid flow data structure.");
+      }
+    } catch (error) {
+      console.error("Error loading flow from localStorage:", error);
+      toast({ title: "Error Loading Flow", description: "Could not load flow. Data may be corrupted.", variant: "destructive" });
+    }
+  };
+
+  const executeFlow = async () => {
+    setIsExecutingFlow(true);
+    const serializedNodes = nodes.map(node => ({
+      id: node.id,
+      type: node.type,
+      config: node.data || {}, 
+    }));
+
+    const serializedEdges = edges.map(edge => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+    }));
+
+    const flowToExecute = {
+      nodes: serializedNodes,
+      edges: serializedEdges,
+    };
+
+    console.log("Sending Flow to Backend:\n", JSON.stringify(flowToExecute, null, 2));
+
+    try {
+      const response = await fetch('/api/v1/process-flow/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(flowToExecute),
+      });
+
+      if (response.ok) {
+        const backendResponse = await response.json();
+        toast({
+          title: "Flow Submitted Successfully",
+          description: backendResponse.message || "Backend processed the flow.",
+        });
+        console.log("Backend Response:", backendResponse);
+        // Potentially update UI based on backendResponse.received_flow or other data
+      } else {
+        let errorMessage = `API Error: ${response.status} ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorMessage;
+        } catch (e) {
+          // Could not parse JSON error, stick with status text
+        }
+        toast({
+          title: "Error Submitting Flow",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Network or other error submitting flow:", error);
+      toast({
+        title: "Network Error",
+        description: `Could not connect to the backend. ${error instanceof Error ? error.message : ''}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsExecutingFlow(false);
+    }
   };
 
   return (
@@ -144,9 +250,18 @@ const ProcessingFlowCanvas: React.FC = () => {
                 <Button size="xs" variant="outline" onClick={() => addNode('chunkNode', 'Chunk')}>Chunk</Button>
                 <Button size="xs" variant="outline" onClick={() => addNode('extractLLMNode', 'LLM Extract')}>LLM Extract</Button>
                 <Button size="xs" variant="outline" onClick={() => addNode('outputNode', 'Output')}>Output</Button>
-                <div className="border-l h-5 mx-2"></div> {/* Vertical Separator */}
-                <Button size="xs" variant="outline" onClick={saveFlow}>Save Flow</Button>
-                <Button size="xs" variant="outline" onClick={loadFlow}>Load Flow</Button>
+                <div className="border-l h-5 mx-2"></div> 
+                <Button size="xs" variant="outline" onClick={saveFlowWrapper}>Save Flow</Button>
+                <Button size="xs" variant="outline" onClick={loadFlowWrapper}>Load Flow</Button>
+                <div className="border-l h-5 mx-2"></div> 
+                <Button 
+                  size="xs" 
+                  variant="destructive" 
+                  onClick={executeFlow}
+                  disabled={isExecutingFlow}
+                >
+                  {isExecutingFlow ? 'Executing...' : 'Execute Flow'}
+                </Button>
             </div>
             <ReactFlow
               nodes={nodes}
@@ -156,7 +271,7 @@ const ProcessingFlowCanvas: React.FC = () => {
               onConnect={onConnect}
               onNodeClick={onNodeClick}
               onPaneClick={onPaneClick}
-              onInit={setReactFlowInstance} // Already correctly capturing instance
+              onInit={setReactFlowInstance} 
               nodeTypes={nodeTypes}
               fitView
               className="bg-background"
@@ -180,62 +295,5 @@ const ProcessingFlowCanvas: React.FC = () => {
     </div>
   );
 };
-
-// Add saveFlow and loadFlow functions here
-
-const saveFlow = (rfInstance: ReactFlowInstance | null, nodesToSave: Node[], edgesToSave: Edge[], toastFn: Function, key: string) => {
-  if (!rfInstance) {
-    toastFn({ title: "Error", description: "React Flow instance not available.", variant: "destructive" });
-    return;
-  }
-
-  const viewport = rfInstance.getViewport();
-  const flowState = {
-    nodes: nodesToSave,
-    edges: edgesToSave,
-    viewport: viewport,
-  };
-
-  try {
-    localStorage.setItem(key, JSON.stringify(flowState));
-    toastFn({ title: "Flow Saved", description: "Current flow state saved to local storage." });
-  } catch (error) {
-    console.error("Error saving flow to localStorage:", error);
-    toastFn({ title: "Error Saving Flow", description: "Could not save flow to local storage.", variant: "destructive" });
-  }
-};
-
-const loadFlow = (
-    setNodesFn: (nodes: Node[]) => void, 
-    setEdgesFn: (edges: Edge[]) => void, 
-    rfInstance: ReactFlowInstance | null, 
-    toastFn: Function, 
-    key: string
-  ) => {
-  try {
-    const storedFlow = localStorage.getItem(key);
-    if (!storedFlow) {
-      toastFn({ title: "No Saved Flow", description: "No flow state found in local storage." });
-      return;
-    }
-
-    const parsedFlow = JSON.parse(storedFlow);
-
-    if (parsedFlow && parsedFlow.nodes && parsedFlow.edges && parsedFlow.viewport) {
-      setNodesFn(parsedFlow.nodes);
-      setEdgesFn(parsedFlow.edges);
-      if (rfInstance) {
-        rfInstance.setViewport(parsedFlow.viewport);
-      }
-      toastFn({ title: "Flow Loaded", description: "Flow state restored from local storage." });
-    } else {
-      throw new Error("Invalid flow data structure.");
-    }
-  } catch (error) {
-    console.error("Error loading flow from localStorage:", error);
-    toastFn({ title: "Error Loading Flow", description: "Could not load flow. Data may be corrupted.", variant: "destructive" });
-  }
-};
-
 
 export default ProcessingFlowCanvas;

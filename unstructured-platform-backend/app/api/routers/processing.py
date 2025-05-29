@@ -115,3 +115,27 @@ async def process_document(
             os.remove(temp_file_path)
         if file:
             await file.close()
+
+# Import the flow schemas
+from app.core.schemas.flow import ProcessingFlow, FlowNode, FlowEdge
+
+@router.post("/process-flow/")
+async def process_flow(flow_data: ProcessingFlow):
+    """
+    Placeholder endpoint to receive a processing flow definition.
+    Currently, it only logs the received flow and returns a confirmation.
+    """
+    # Log the received flow data (using print for simplicity in sandbox, use logger in production)
+    print("Received processing flow:")
+    print(flow_data.model_dump_json(indent=2))
+
+    # You can access individual parts like:
+    # print("Nodes:", flow_data.nodes)
+    # print("Edges:", flow_data.edges)
+    # for node in flow_data.nodes:
+    #     print(f"Node ID: {node.id}, Type: {node.type}, Config: {node.config}")
+
+    return {
+        "message": "Flow received successfully. Processing not yet implemented.",
+        "received_flow": flow_data.model_dump()
+    }
