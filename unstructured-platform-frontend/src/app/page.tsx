@@ -3,22 +3,28 @@
 import React, { useState } from 'react';
 import Image from "next/image";
 import DocumentUpload from "@/components/custom/DocumentUpload";
-import ProcessingConfiguration from "@/components/custom/ProcessingConfiguration";
-import ResultDisplay from "@/components/custom/ResultDisplay"; // Import ResultDisplay
-import { Button } from "@/components/ui/button"; // For the process button
-
-// Define types for configuration state
-type PartitioningStrategy = "auto" | "hi_res" | "ocr_only" | "fast";
-interface ProcessingConfig {
-  strategy: PartitioningStrategy;
-  removeExtraWhitespace: boolean;
-}
+import ProcessingConfiguration, { ProcessingConfig, PartitioningStrategy, ChunkingStrategy } from "@/components/custom/ProcessingConfiguration";
+import ResultDisplay from "@/components/custom/ResultDisplay";
+import ProcessingTemplates from "@/components/custom/ProcessingTemplates"; // Import ProcessingTemplates
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const [selectedDocs, setSelectedDocs] = useState<File[]>([]);
   const [processingConfig, setProcessingConfig] = useState<ProcessingConfig>({
-    strategy: "auto",
+    // Partitioning
+    strategy: "auto" as PartitioningStrategy, // Cast for initial state
     removeExtraWhitespace: true,
+    ocrLanguages: "eng",
+    pdfInferTableStructure: true,
+    extractImageBlockTypes: "", 
+    
+    // Chunking
+    chunkingStrategy: "none" as ChunkingStrategy, // Cast for initial state
+    chunkMaxCharacters: 500,
+    chunkNewAfterNChars: 500,
+    chunkCombineTextUnderNChars: 200, 
+    chunkOverlap: 0,
+    chunkMultipageSections: true, 
   });
   const [processedData, setProcessedData] = useState<any | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
@@ -26,12 +32,18 @@ export default function Home() {
 
   const handleFilesSelected = (files: File[]) => {
     setSelectedDocs(files);
-    setProcessedData(null); // Clear previous results when new files are selected
+    setProcessedData(null); 
     setProcessingError(null);
   };
 
   const handleConfigurationChange = (newConfig: ProcessingConfig) => {
     setProcessingConfig(newConfig);
+  };
+
+  const handleLoadTemplateConfig = (loadedConfig: ProcessingConfig) => {
+    setProcessingConfig(loadedConfig);
+    // Optional: Add toast notification here if desired, e.g., using useToast()
+    // toast({ title: "Template Loaded", description: "Configuration has been updated." });
   };
 
   const handleProcessDocuments = async () => {
@@ -44,14 +56,22 @@ export default function Home() {
     setProcessingError(null);
 
     const formData = new FormData();
-    formData.append('file', selectedDocs[0]); // Assuming one file for now
-    formData.append('strategy', processingConfig.strategy);
-    formData.append('remove_extra_whitespace', String(processingConfig.removeExtraWhitespace));
+    formData.append('file', selectedDocs[0]); 
+    
+    Object.entries(processingConfig).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (typeof value === 'boolean') {
+          formData.append(key, String(value));
+        } else if (typeof value === 'number') {
+           formData.append(key, String(value));
+        } else {
+          formData.append(key, value as string);
+        }
+      }
+    });
 
     try {
-      // Assuming backend is running on port 8000 relative to the frontend's host
-      // In a real deployment, this URL should be configurable.
-      const response = await fetch('/api/v1/process-document/', { // Using relative path for proxy
+      const response = await fetch('/api/v1/process-document/', {
         method: 'POST',
         body: formData,
       });
@@ -90,13 +110,16 @@ export default function Home() {
             <>
               <ProcessingConfiguration 
                 onConfigurationChange={handleConfigurationChange}
-                initialStrategy={processingConfig.strategy}
-                initialRemoveExtraWhitespace={processingConfig.removeExtraWhitespace}
+                initialConfig={processingConfig}
+              />
+              <ProcessingTemplates 
+                currentConfig={processingConfig}
+                onLoadTemplate={handleLoadTemplateConfig}
               />
               <Button 
                 onClick={handleProcessDocuments}
                 disabled={isProcessing || selectedDocs.length === 0}
-                className="mt-6"
+                className="mt-8" // Added more margin top for spacing
               >
                 {isProcessing ? 'Processing...' : 'Process Documents'}
               </Button>
