@@ -4,9 +4,11 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { useDropzone, FileRejection, Accept } from 'react-dropzone';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button'; // Import Button
 
 interface DocumentUploadProps {
   onFilesSelected: (files: File[]) => void;
+  onPreviewFile: (file: File) => void; // New prop for triggering preview
 }
 
 const acceptedFileTypes: Accept = {
@@ -111,15 +113,26 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesSelected }) => {
                       ({Math.round(file.size / 1024)} KB) - {file.type || 'unknown type'}
                     </span>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeFile(file.name)}
-                    className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90 h-auto px-2 py-1"
-                    aria-label={`Remove ${file.name}`}
-                  >
-                    Remove
-                  </Button>
+                  <div className="space-x-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onPreviewFile(file)} // Call onPreviewFile prop
+                      className="h-auto px-2 py-1 text-xs"
+                      aria-label={`Preview ${file.name}`}
+                    >
+                      Preview
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeFile(file.name)}
+                      className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90 h-auto px-2 py-1 text-xs"
+                      aria-label={`Remove ${file.name}`}
+                    >
+                      Remove
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>

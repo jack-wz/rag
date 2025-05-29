@@ -1,25 +1,29 @@
-"use client"; // Required for useState and other hooks
+"use client";
 
 import React, { useState } from 'react';
 import Image from "next/image";
 import DocumentUpload from "@/components/custom/DocumentUpload";
 import ProcessingConfiguration, { ProcessingConfig, PartitioningStrategy, ChunkingStrategy } from "@/components/custom/ProcessingConfiguration";
 import ResultDisplay from "@/components/custom/ResultDisplay";
-import ProcessingTemplates from "@/components/custom/ProcessingTemplates"; // Import ProcessingTemplates
+import ProcessingTemplates from "@/components/custom/ProcessingTemplates"; 
+import DocumentPreviewModal from "@/components/custom/DocumentPreviewModal";
+import ProcessingFlowCanvas from "@/components/custom/flow/ProcessingFlowCanvas";
+import OllamaConfigSettings from "@/components/custom/OllamaConfigSettings"; // Import Ollama settings
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 export default function Home() {
   const [selectedDocs, setSelectedDocs] = useState<File[]>([]);
   const [processingConfig, setProcessingConfig] = useState<ProcessingConfig>({
     // Partitioning
-    strategy: "auto" as PartitioningStrategy, // Cast for initial state
+    strategy: "auto" as PartitioningStrategy, 
     removeExtraWhitespace: true,
     ocrLanguages: "eng",
     pdfInferTableStructure: true,
     extractImageBlockTypes: "", 
     
     // Chunking
-    chunkingStrategy: "none" as ChunkingStrategy, // Cast for initial state
+    chunkingStrategy: "none" as ChunkingStrategy, 
     chunkMaxCharacters: 500,
     chunkNewAfterNChars: 500,
     chunkCombineTextUnderNChars: 200, 
@@ -29,6 +33,8 @@ export default function Home() {
   const [processedData, setProcessedData] = useState<any | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false); // New state for modal
+  const [fileToPreview, setFileToPreview] = useState<File | null>(null); // New state for file to preview
 
   const handleFilesSelected = (files: File[]) => {
     setSelectedDocs(files);
@@ -42,8 +48,17 @@ export default function Home() {
 
   const handleLoadTemplateConfig = (loadedConfig: ProcessingConfig) => {
     setProcessingConfig(loadedConfig);
-    // Optional: Add toast notification here if desired, e.g., using useToast()
-    // toast({ title: "Template Loaded", description: "Configuration has been updated." });
+    // Optional: Add toast notification here if desired
+  };
+
+  const openPreviewModal = (file: File) => { // Function to open modal
+    setFileToPreview(file);
+    setIsPreviewModalOpen(true);
+  };
+
+  const closePreviewModal = () => { // Function to close modal
+    setIsPreviewModalOpen(false);
+    setFileToPreview(null);
   };
 
   const handleProcessDocuments = async () => {
@@ -52,7 +67,7 @@ export default function Home() {
       return;
     }
     setIsProcessing(true);
-    setProcessedData({ elements: [] }); // Initialize as an object with an empty elements array
+    setProcessedData({ elements: [] }); 
     setProcessingError(null);
 
     let allProcessedElements: any[] = [];
@@ -81,12 +96,11 @@ export default function Home() {
         if (!response.ok) {
           const errorData = await response.json();
           errors.push(`Error processing ${doc.name}: ${errorData.detail || response.statusText}`);
-          continue; // Move to the next file
+          continue; 
         }
 
         const result = await response.json();
         if (result.elements && Array.isArray(result.elements)) {
-          // Add filename to each element's metadata for clarity in combined results
           const elementsWithFilename = result.elements.map((el: any) => ({
             ...el,
             metadata: {
@@ -105,7 +119,7 @@ export default function Home() {
     if (allProcessedElements.length > 0) {
       setProcessedData({ elements: allProcessedElements });
     } else {
-      setProcessedData(null); // No successful results
+      setProcessedData(null); 
     }
 
     if (errors.length > 0) {
@@ -121,14 +135,16 @@ export default function Home() {
         <div className="flex flex-col items-center gap-8 w-full">
           <Image
             className="dark:invert"
-          src="/next.svg"
             alt="Next.js logo"
             width={180}
             height={38}
             priority
           />
           
-          <DocumentUpload onFilesSelected={handleFilesSelected} />
+          <DocumentUpload 
+            onFilesSelected={handleFilesSelected} 
+            onPreviewFile={openPreviewModal} // Pass the open function
+          />
 
           {selectedDocs.length > 0 && (
             <>
@@ -143,7 +159,7 @@ export default function Home() {
               <Button 
                 onClick={handleProcessDocuments}
                 disabled={isProcessing || selectedDocs.length === 0}
-                className="mt-8" // Added more margin top for spacing
+                className="mt-8" 
               >
                 {isProcessing ? 'Processing...' : 'Process Documents'}
               </Button>
@@ -156,31 +172,6 @@ export default function Home() {
         </div>
       </main>
       <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center mt-8">
-              href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Image
-                className="dark:invert"
-                src="/vercel.svg"
-                alt="Vercel logomark"
-                width={20}
-                height={20}
-              />
-              Deploy now
-            </a>
-            <a
-              className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-              href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Read our docs
-            </a>
-          </div> */}
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center mt-8"> {/* Added margin-top for spacing */}
         <a
           className="flex items-center gap-2 hover:underline hover:underline-offset-4"
           href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
@@ -227,6 +218,29 @@ export default function Home() {
           Go to nextjs.org →
         </a>
       </footer>
+      <DocumentPreviewModal 
+        isOpen={isPreviewModalOpen}
+        onClose={closePreviewModal}
+        file={fileToPreview}
+      />
+      
+      {/* New Section for Node-Based UI */}
+      <div className="w-full max-w-6xl px-4 md:px-6 lg:px-8 mt-12 mb-8">
+        <Separator className="my-8" />
+        <h2 className="text-2xl font-semibold text-center mb-6">
+          Experimental: Node-Based Processing Pipeline
+        </h2>
+        <ProcessingFlowCanvas />
+      </div>
+
+      {/* New Section for Ollama Configuration */}
+      <div className="w-full max-w-2xl px-4 md:px-6 lg:px-8 mt-12 mb-8">
+        <Separator className="my-8" />
+        <h2 className="text-2xl font-semibold text-center mb-6">
+          Ollama Configuration
+        </h2>
+        <OllamaConfigSettings />
+      </div>
     </div>
   );
 }
