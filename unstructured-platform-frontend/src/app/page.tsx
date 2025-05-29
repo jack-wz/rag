@@ -32,9 +32,13 @@ export default function Home() {
   });
   const [processedData, setProcessedData] = useState<any | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false); // New state for modal
-  const [fileToPreview, setFileToPreview] = useState<File | null>(null); // New state for file to preview
+  const [isProcessing, setIsProcessing] = useState<boolean>(false); // For form-based submission
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
+  const [fileToPreview, setFileToPreview] = useState<File | null>(null);
+
+  // Note: isProcessing above is for the original form submission.
+  // ProcessingFlowCanvas will manage its own isExecutingFlow state internally for its button.
+  // We need to handle the results from ProcessingFlowCanvas here.
 
   const handleFilesSelected = (files: File[]) => {
     setSelectedDocs(files);
@@ -48,17 +52,34 @@ export default function Home() {
 
   const handleLoadTemplateConfig = (loadedConfig: ProcessingConfig) => {
     setProcessingConfig(loadedConfig);
-    // Optional: Add toast notification here if desired
   };
 
-  const openPreviewModal = (file: File) => { // Function to open modal
+  const openPreviewModal = (file: File) => {
     setFileToPreview(file);
     setIsPreviewModalOpen(true);
   };
 
-  const closePreviewModal = () => { // Function to close modal
+  const closePreviewModal = () => {
     setIsPreviewModalOpen(false);
     setFileToPreview(null);
+  };
+  
+  // Callback for when flow execution is successful
+  const handleFlowResult = (result: any) => {
+    if (result && result.processed_elements) {
+      setProcessedData({ elements: result.processed_elements }); // Ensure structure matches ResultDisplay
+    } else if (result && result.message) { // If no elements, but a message (e.g. input->output)
+       setProcessedData({ elements: [{ type: "Info", text: result.message, metadata: { filename: result.received_filename || "" }}] });
+    } else {
+      setProcessedData(null); // Or some other indication of no elements
+    }
+    setProcessingError(null);
+  };
+
+  // Callback for when flow execution fails
+  const handleFlowError = (error: string) => {
+    setProcessingError(error);
+    setProcessedData(null);
   };
 
   const handleProcessDocuments = async () => {

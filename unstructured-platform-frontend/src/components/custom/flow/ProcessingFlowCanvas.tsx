@@ -31,7 +31,13 @@ import ChunkNode from './nodes/ChunkNode';
 import ExtractLLMNode from './nodes/ExtractLLMNode';
 import OutputNode from './nodes/OutputNode';
 
-let idCounter = 0; // Renamed from 'id' to avoid conflict
+interface ProcessingFlowCanvasProps {
+  selectedFile: File | null; // Prop to receive the selected file
+  onFlowExecutionResult: (result: any) => void; // Callback for success
+  onFlowExecutionError: (error: string) => void; // Callback for error
+}
+
+let idCounter = 0;
 const getId = () => `dndnode_${idCounter++}`;
 
 const initialNodes: Node[] = [
@@ -49,7 +55,11 @@ const initialNodes: Node[] = [
   },
 ];
 
-const ProcessingFlowCanvas: React.FC = () => {
+const ProcessingFlowCanvas: React.FC<ProcessingFlowCanvasProps> = ({ 
+  selectedFile, 
+  onFlowExecutionResult, 
+  onFlowExecutionError 
+}) => {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -171,64 +181,74 @@ const ProcessingFlowCanvas: React.FC = () => {
   };
 
   const executeFlow = async () => {
+    if (!selectedFile) {
+      toast({
+        title: "No File Selected",
+        description: "Please select a document before executing the flow.",
+        variant: "destructive",
+      });
+      onFlowExecutionError("No file selected for flow execution.");
+      return;
+    }
+
     setIsExecutingFlow(true);
+    onFlowExecutionResult(null); // Clear previous results
+    onFlowExecutionError("");   // Clear previous errors
+
     const serializedNodes = nodes.map(node => ({
       id: node.id,
       type: node.type,
       config: node.data || {}, 
     }));
-
     const serializedEdges = edges.map(edge => ({
       id: edge.id,
       source: edge.source,
       target: edge.target,
     }));
-
     const flowToExecute = {
       nodes: serializedNodes,
       edges: serializedEdges,
     };
 
-    console.log("Sending Flow to Backend:\n", JSON.stringify(flowToExecute, null, 2));
+    const formData = new FormData();
+    formData.append('flow_data_json', JSON.stringify(flowToExecute));
+    formData.append('file', selectedFile);
+
+    console.log("Sending Flow to Backend with file:", selectedFile.name);
 
     try {
       const response = await fetch('/api/v1/process-flow/', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(flowToExecute),
+        // DO NOT set Content-Type header for FormData, browser does it.
+        body: formData,
       });
 
+      const backendResponse = await response.json(); // Try to parse JSON regardless of response.ok for error details
+
       if (response.ok) {
-        const backendResponse = await response.json();
         toast({
-          title: "Flow Submitted Successfully",
+          title: "Flow Executed Successfully",
           description: backendResponse.message || "Backend processed the flow.",
         });
-        console.log("Backend Response:", backendResponse);
-        // Potentially update UI based on backendResponse.received_flow or other data
+        onFlowExecutionResult(backendResponse); // Pass full response to parent
       } else {
-        let errorMessage = `API Error: ${response.status} ${response.statusText}`;
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.detail || errorMessage;
-        } catch (e) {
-          // Could not parse JSON error, stick with status text
-        }
+        const errorMessage = backendResponse.detail || `API Error: ${response.status} ${response.statusText}`;
         toast({
-          title: "Error Submitting Flow",
+          title: "Error Executing Flow",
           description: errorMessage,
           variant: "destructive",
         });
+        onFlowExecutionError(errorMessage);
       }
     } catch (error) {
-      console.error("Network or other error submitting flow:", error);
+      console.error("Network or other error executing flow:", error);
+      const errMessage = `Could not connect to the backend or other error: ${error instanceof Error ? error.message : String(error)}`;
       toast({
         title: "Network Error",
-        description: `Could not connect to the backend. ${error instanceof Error ? error.message : ''}`,
+        description: errMessage,
         variant: "destructive",
       });
+      onFlowExecutionError(errMessage);
     } finally {
       setIsExecutingFlow(false);
     }
