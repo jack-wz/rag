@@ -52,43 +52,67 @@ export default function Home() {
       return;
     }
     setIsProcessing(true);
-    setProcessedData(null);
+    setProcessedData({ elements: [] }); // Initialize as an object with an empty elements array
     setProcessingError(null);
 
-    const formData = new FormData();
-    formData.append('file', selectedDocs[0]); 
-    
-    Object.entries(processingConfig).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        if (typeof value === 'boolean') {
-          formData.append(key, String(value));
-        } else if (typeof value === 'number') {
-           formData.append(key, String(value));
-        } else {
-          formData.append(key, value as string);
-        }
-      }
-    });
+    let allProcessedElements: any[] = [];
+    let errors: string[] = [];
 
-    try {
-      const response = await fetch('/api/v1/process-document/', {
-        method: 'POST',
-        body: formData,
+    for (const doc of selectedDocs) {
+      const formData = new FormData();
+      formData.append('file', doc);
+      
+      Object.entries(processingConfig).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          if (typeof value === 'boolean' || typeof value === 'number') {
+            formData.append(key, String(value));
+          } else {
+            formData.append(key, value as string);
+          }
+        }
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || `API Error: ${response.status} ${response.statusText}`);
-      }
+      try {
+        const response = await fetch('/api/v1/process-document/', {
+          method: 'POST',
+          body: formData,
+        });
 
-      const result = await response.json();
-      setProcessedData(result);
-    } catch (error) {
-      console.error("Processing error:", error);
-      setProcessingError(error instanceof Error ? error.message : "An unknown error occurred.");
-    } finally {
-      setIsProcessing(false);
+        if (!response.ok) {
+          const errorData = await response.json();
+          errors.push(`Error processing ${doc.name}: ${errorData.detail || response.statusText}`);
+          continue; // Move to the next file
+        }
+
+        const result = await response.json();
+        if (result.elements && Array.isArray(result.elements)) {
+          // Add filename to each element's metadata for clarity in combined results
+          const elementsWithFilename = result.elements.map((el: any) => ({
+            ...el,
+            metadata: {
+              ...el.metadata,
+              original_filename: doc.name 
+            }
+          }));
+          allProcessedElements = [...allProcessedElements, ...elementsWithFilename];
+        }
+      } catch (error) {
+        console.error(`Processing error for ${doc.name}:`, error);
+        errors.push(`Error processing ${doc.name}: ${error instanceof Error ? error.message : "An unknown error occurred."}`);
+      }
     }
+
+    if (allProcessedElements.length > 0) {
+      setProcessedData({ elements: allProcessedElements });
+    } else {
+      setProcessedData(null); // No successful results
+    }
+
+    if (errors.length > 0) {
+      setProcessingError(errors.join('\n'));
+    }
+
+    setIsProcessing(false);
   };
 
   return (

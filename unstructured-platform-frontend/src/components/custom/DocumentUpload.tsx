@@ -27,43 +27,46 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesSelected }) => {
 
   const onDrop = useCallback((acceptedFiles: File[], fileRejections: FileRejection[]) => {
     setSelectedFiles(prevFiles => {
-      const newFiles = [...prevFiles, ...acceptedFiles];
-      // onFilesSelected(newFiles); // Call onFilesSelected here as well if immediate update is needed
-      return newFiles;
+      const newAndUniqueFiles = acceptedFiles.filter(newFile => 
+        !prevFiles.some(existingFile => 
+          existingFile.name === newFile.name && existingFile.size === newFile.size
+        )
+      );
+      return [...prevFiles, ...newAndUniqueFiles];
     });
-    setRejectedFiles(fileRejections);
+    setRejectedFiles(prevRejected => [...prevRejected, ...fileRejections]); // Append new rejections
 
-    // Simulate upload start
-    if (acceptedFiles.length > 0) {
+    // Simulate upload start for newly added unique files
+    if (acceptedFiles.length > 0) { // Keep simulation logic, or adjust based on newAndUniqueFiles.length
       setIsUploading(true);
       // Simulate upload completion after a delay
       setTimeout(() => {
         setIsUploading(false);
         // Here you would typically call an actual upload function
-        console.log('Simulated upload finished for:', acceptedFiles.map(f => f.name));
+        // Consider logging only for newAndUniqueFiles if that's desired
+        console.log('Simulated upload finished for accepted files:', acceptedFiles.map(f => f.name));
       }, 3000);
     }
-  }, []); // Removed onFilesSelected from dependencies as it's stable if wrapped in useCallback on parent
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: acceptedFileTypes,
+    multiple: true, // Explicitly set, though it's default
     maxSize: 10 * 1024 * 1024, // 10MB limit example
   });
 
   const removeFile = (fileName: string) => {
-    setSelectedFiles(prevFiles => {
-      const newFiles = prevFiles.filter(file => file.name !== fileName);
-      // onFilesSelected(newFiles); // Call onFilesSelected here
-      return newFiles;
-    });
+    setSelectedFiles(prevFiles => 
+      prevFiles.filter(file => file.name !== fileName)
+    );
   };
 
   return (
     <Card className="w-full max-w-lg">
       <CardHeader>
         <CardTitle>Upload Documents</CardTitle>
-        <CardDescription>Drag & drop files here, or click to select files.</CardDescription>
+        <CardDescription>Drag & drop files here, or click to select files. Multiple files are supported.</CardDescription>
       </CardHeader>
       <CardContent>
         <div
@@ -76,17 +79,18 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesSelected }) => {
           {isDragActive ? (
             <p className="text-center text-primary">Drop the files here ...</p>
           ) : (
-            <p className="text-center text-muted-foreground">Drag 'n' drop some files here, or click to select files</p>
+            <p className="text-center text-muted-foreground">Drag 'n' drop files here, or click to select files</p>
           )}
         </div>
 
         {rejectedFiles.length > 0 && (
-          <Alert variant="destructive" className="mt-4">
+          <Alert variant="destructive" className="mt-4 max-h-40 overflow-y-auto">
             <AlertDescription>
               Some files were rejected:
               <ul className="list-disc list-inside text-xs">
-                {rejectedFiles.map(({ file, errors }) => (
-                  <li key={file.name}>
+                {rejectedFiles.map(({ file, errors }, index) => (
+                  // Using index for key as file.name might not be unique among rejected if retrying
+                  <li key={`${file.name}-${index}`}> 
                     {file.name} - {errors.map(e => e.message).join(', ')}
                   </li>
                 ))}
@@ -97,23 +101,28 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesSelected }) => {
 
         {selectedFiles.length > 0 && (
           <div className="mt-4">
-            <h4 className="font-semibold">Selected Files:</h4>
-            <ul className="list-disc list-inside text-sm space-y-1 mt-2">
+            <h4 className="font-semibold">Selected Files ({selectedFiles.length}):</h4>
+            <div className="max-h-60 overflow-y-auto border rounded-md p-2 mt-1 space-y-1">
               {selectedFiles.map(file => (
-                <li key={file.name} className="flex justify-between items-center">
-                  <span>
-                    {file.name} ({Math.round(file.size / 1024)} KB) - {file.type}
-                  </span>
-                  <button
+                <div key={`${file.name}-${file.lastModified}`} className="flex justify-between items-center p-1.5 bg-muted/50 rounded text-sm">
+                  <div>
+                    <span className="font-medium">{file.name}</span>
+                    <span className="text-xs text-muted-foreground ml-2">
+                      ({Math.round(file.size / 1024)} KB) - {file.type || 'unknown type'}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => removeFile(file.name)}
-                    className="text-xs text-red-500 hover:text-red-700"
+                    className="text-destructive hover:text-destructive-foreground hover:bg-destructive/90 h-auto px-2 py-1"
                     aria-label={`Remove ${file.name}`}
                   >
                     Remove
-                  </button>
-                </li>
+                  </Button>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         )}
 

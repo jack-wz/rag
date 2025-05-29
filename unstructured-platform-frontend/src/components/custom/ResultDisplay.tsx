@@ -4,20 +4,23 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'; // For fallback table display
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button'; // Import Button
 
 interface ElementMetadata {
   text_as_html?: string;
   page_number?: number;
   filename?: string;
-  [key: string]: any; // Allow other metadata properties
+  source_url?: string; // For CSV export
+  parent_id?: string;  // For CSV export
+  [key: string]: any; 
 }
 
 interface ProcessedElement {
   type: string;
   text: string;
   metadata: ElementMetadata;
-  // Potentially other fields depending on the element type
+  id?: string; // Element ID, sometimes available
   [key: string]: any; 
 }
 
@@ -26,14 +29,81 @@ interface ResultDisplayProps {
   error?: string | null;
 }
 
+// Helper function to export data to JSON
+const exportToJson = (elements: ProcessedElement[], filename: string = "results.json") => {
+  const jsonString = JSON.stringify(elements, null, 2);
+  const blob = new Blob([jsonString], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+};
+
+// Helper function to escape CSV fields
+const escapeCsvField = (field: any): string => {
+  if (field === null || field === undefined) {
+    return '';
+  }
+  const stringField = String(field);
+  // If the field contains a comma, newline, or double quote, wrap it in double quotes
+  if (stringField.includes(',') || stringField.includes('\n') || stringField.includes('"')) {
+    // Escape double quotes within the field by doubling them
+    return `"${stringField.replace(/"/g, '""')}"`;
+  }
+  return stringField;
+};
+
+// Helper function to export data to CSV
+const exportToCsv = (elements: ProcessedElement[], filename: string = "results.csv") => {
+  if (!elements || elements.length === 0) return;
+
+  const headers = ['ID', 'Type', 'Text', 'Filename', 'Page Number', 'Source URL', 'Parent ID'];
+  const csvRows = [headers.join(',')]; // Header row
+
+  elements.forEach(el => {
+    const row = [
+      escapeCsvField(el.id || ''), // Use element ID if available
+      escapeCsvField(el.type),
+      escapeCsvField(el.text),
+      escapeCsvField(el.metadata?.filename || ''),
+      escapeCsvField(el.metadata?.page_number || ''),
+      escapeCsvField(el.metadata?.source_url || ''), // Assuming source_url might be a metadata field
+      escapeCsvField(el.metadata?.parent_id || ''),  // Assuming parent_id might be a metadata field
+    ];
+    csvRows.push(row.join(','));
+  });
+
+  const csvString = csvRows.join('\n');
+  const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+};
+
+
 const ElementDisplay: React.FC<{ element: ProcessedElement }> = ({ element }) => {
-  const { type, text, metadata } = element;
+  const { type, text, metadata, id } = element;
 
   const renderMetadata = () => (
-    <div className="mt-2 text-xs text-muted-foreground space-x-2">
-      <Badge variant="outline">{type}</Badge>
-      {metadata.filename && <span>File: {metadata.filename}</span>}
-      {metadata.page_number && <span>Page: {metadata.page_number}</span>}
+    <div className="mt-2 text-xs text-muted-foreground space-y-1"> {/* Changed to space-y-1 for better layout with multiple lines */}
+      <div>
+        <Badge variant="outline" className="mr-2">{type}</Badge>
+        {id && <span className="mr-2">ID: {id.substring(0,8)}...</span>}
+        {/* Display original_filename if available, otherwise fallback to filename */}
+        {(metadata.original_filename || metadata.filename) && (
+          <span className="mr-2">
+            Source: {metadata.original_filename || metadata.filename}
+          </span>
+        )}
+        {metadata.page_number && <span>Page: {metadata.page_number}</span>}
+      </div>
     </div>
   );
 
@@ -176,16 +246,38 @@ const ResultDisplay: React.FC<ResultDisplayProps> = ({ data, error }) => {
   }
 
   return (
-    <div className="w-full max-w-3xl mt-6 space-y-4 max-h-[70vh] overflow-y-auto p-1">
-      <CardHeader className="p-0 mb-2 sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
-        <CardTitle>Processed Document Elements</CardTitle>
-        <CardDescription>
-          Below are the elements extracted from your document, rendered by type.
-        </CardDescription>
+    <div className="w-full max-w-3xl mt-6 space-y-4">
+      <CardHeader className="p-0 mb-2 sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10 flex flex-row justify-between items-center">
+        <div>
+          <CardTitle>Processed Document Elements</CardTitle>
+          <CardDescription>
+            Below are the elements extracted from your document, rendered by type.
+          </CardDescription>
+        </div>
+        <div className="flex space-x-2">
+          <Button
+            onClick={() => exportToJson(data.elements, `results-${new Date().toISOString()}.json`)}
+            disabled={!data || !data.elements || data.elements.length === 0}
+            variant="outline"
+            size="sm"
+          >
+            Export as JSON
+          </Button>
+          <Button
+            onClick={() => exportToCsv(data.elements, `results-${new Date().toISOString()}.csv`)}
+            disabled={!data || !data.elements || data.elements.length === 0}
+            variant="outline"
+            size="sm"
+          >
+            Export as CSV
+          </Button>
+        </div>
       </CardHeader>
-      {data.elements.map((element, index) => (
-        <ElementDisplay key={element.id || index} element={element} />
-      ))}
+      <div className="max-h-[calc(70vh-50px)] overflow-y-auto p-1">
+        {data.elements.map((element, index) => (
+          <ElementDisplay key={element.id || index} element={element} />
+        ))}
+      </div>
     </div>
   );
 };
