@@ -18,7 +18,10 @@ const acceptedFileTypes: Accept = {
   'text/html': ['.html', '.htm'],
 };
 
-const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesSelected }) => {
+const DocumentUpload: React.FC<DocumentUploadProps> = ({
+  onFilesSelected,
+  onPreviewFile,
+}) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [rejectedFiles, setRejectedFiles] = useState<FileRejection[]>([]);
   const [isUploading, setIsUploading] = useState<boolean>(false); // Placeholder for upload state
@@ -81,7 +84,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesSelected }) => {
           {isDragActive ? (
             <p className="text-center text-primary">Drop the files here ...</p>
           ) : (
-            <p className="text-center text-muted-foreground">Drag 'n' drop files here, or click to select files</p>
+            <p className="text-center text-muted-foreground">Drag &apos;n&apos; drop files here, or click to select files</p>
           )}
         </div>
 
