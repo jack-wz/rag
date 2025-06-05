@@ -18,7 +18,10 @@ const acceptedFileTypes: Accept = {
   'text/html': ['.html', '.htm'],
 };
 
-const DocumentUpload: React.FC<DocumentUploadProps> = ({ onFilesSelected }) => {
+const DocumentUpload: React.FC<DocumentUploadProps> = ({
+  onFilesSelected,
+  onPreviewFile,
+}) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [rejectedFiles, setRejectedFiles] = useState<FileRejection[]>([]);
   const [isUploading, setIsUploading] = useState<boolean>(false); // Placeholder for upload state
