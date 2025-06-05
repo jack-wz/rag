@@ -5,12 +5,21 @@ from unstructured.chunking.basic import chunk_elements as chunk_elements_basic #
 from unstructured.cleaners.core import clean_extra_whitespace
 import tempfile
 import os
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 router = APIRouter()
 
 # Helper to convert boolean form data
-def string_to_bool(value: str) -> bool:
+def string_to_bool(value: Union[str, bool, None]) -> Optional[bool]:
+    """Convert common truthy/falsey form values to ``bool``.
+
+    Returns ``None`` when ``value`` is ``None`` to make the conversion safe for
+    optional form fields.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
     return value.lower() == "true"
 
 # Pydantic model could be used here for better validation of Form data,
