@@ -1,5 +1,6 @@
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional # Import Optional
+from typing import List, Optional
+
 
 class NodeConfig(BaseModel):
     """
@@ -13,10 +14,11 @@ class NodeConfig(BaseModel):
     strategy: Optional[str] = None
     ocr_languages: Optional[str] = None
     pdf_infer_table_structure: Optional[bool] = None
-    extract_image_block_types: Optional[str] = None # Comma-separated initially from form
-    
+    extract_image_block_types: Optional[str] = None
+    # Comma-separated initially from form
+
     # Cleaning specific (also used in partitioning)
-    remove_extra_whitespace: Optional[bool] = None 
+    remove_extra_whitespace: Optional[bool] = None
 
     # Chunking specific
     chunking_strategy: Optional[str] = None
@@ -25,13 +27,13 @@ class NodeConfig(BaseModel):
     chunk_combine_text_under_n_chars: Optional[int] = None
     chunk_overlap: Optional[int] = None
     chunk_multipage_sections: Optional[bool] = None
-    
+
     # LLM Extract specific
-    extraction_prompt: Optional[str] = None 
+    extraction_prompt: Optional[str] = None
     ollama_server_url: Optional[str] = None
     ollama_model_name: Optional[str] = None
     ollama_temperature: Optional[float] = None
-    
+
     # Allow any other fields as nodes might have diverse configurations not explicitly defined
     class Config:
         extra = "allow"
