@@ -9,18 +9,8 @@ import 'react-pdf/dist/esm/Page/TextLayer.css'; // Recommended for react-pdf
 // @ts-ignore (mammoth doesn't have readily available types for all import styles)
 import mammoth from 'mammoth'; 
 
-// Configure pdfjs worker
-// Try to use the version from pdfjs-dist
-try {
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs', // Using .mjs for ES module compatibility
-    import.meta.url,
-  ).toString();
-} catch (error) {
-  console.error("Failed to set pdfjs.GlobalWorkerOptions.workerSrc from pdfjs-dist:", error);
-  // Fallback if the above fails (e.g. in certain bundler setups or older pdfjs-dist versions)
-  pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
-}
+// Configure pdfjs worker for react-pdf v7
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
 
 
 interface DocumentPreviewModalProps {

@@ -46,6 +46,17 @@ export default function Home() {
     setProcessingError(null);
   };
 
+  // Handlers for ProcessingFlowCanvas
+  const handleFlowExecutionResult = (result: any) => {
+    setProcessedData(result);
+    setProcessingError(null);
+  };
+
+  const handleFlowExecutionError = (error: string) => {
+    setProcessingError(error);
+    setProcessedData(null);
+  };
+
   const handleConfigurationChange = (newConfig: ProcessingConfig) => {
     setProcessingConfig(newConfig);
   };
@@ -156,6 +167,7 @@ export default function Home() {
         <div className="flex flex-col items-center gap-8 w-full">
           <Image
             className="dark:invert"
+            src="/next.svg"
             alt="Next.js logo"
             width={180}
             height={38}
@@ -251,7 +263,11 @@ export default function Home() {
         <h2 className="text-2xl font-semibold text-center mb-6">
           Experimental: Node-Based Processing Pipeline
         </h2>
-        <ProcessingFlowCanvas />
+        <ProcessingFlowCanvas 
+          selectedFile={selectedDocs[0] || null}
+          onFlowExecutionResult={handleFlowExecutionResult}
+          onFlowExecutionError={handleFlowExecutionError}
+        />
       </div>
 
       {/* New Section for Ollama Configuration */}
