@@ -4,21 +4,26 @@ This repository contains a simple FastAPI backend and a Next.js frontend used fo
 
 ## Backend
 
-The backend lives in `unstructured-platform-backend`. After installing the Python dependencies you can run it with:
+The backend lives in `unstructured-platform-backend`.
+Run the following to install dependencies and start the development server:
 
 ```bash
+cd unstructured-platform-backend
+pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
-The service exposes a basic health check at `/health` and a `/api/v1/process-document/` endpoint for uploading documents.
+This exposes a basic health check at `/health` and a `/api/v1/process-document/` endpoint for uploading documents.
 
 ## Frontend
 
 The Next.js application resides in `unstructured-platform-frontend`.
-After installing the Node dependencies with `npm install` you can start the dev server:
+Run the following to install dependencies and start the dev server:
 
 ```bash
+cd ../unstructured-platform-frontend
+npm install
 npm run dev
 ```
 
-The app will be available on <http://localhost:3000>.
+The app will be available at <http://localhost:3000>.

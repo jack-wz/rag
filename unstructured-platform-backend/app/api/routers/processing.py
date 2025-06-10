@@ -77,8 +77,8 @@ async def process_document(
         # but for partition (auto), it's often tied to hi_res or specific handling.
         # We'll pass it if not None, unstructured handles if it's applicable.
         _pdf_infer_table_structure = string_to_bool(pdf_infer_table_structure)
-        if _pdf_infer_table_structure is not None: # Check if it was provided
-             partition_kwargs["pdf_infer_table_structure"] = _pdf_infer_table_structure
+        if _pdf_infer_table_structure is not None:  # Check if it was provided
+            partition_kwargs["pdf_infer_table_structure"] = _pdf_infer_table_structure
 
 
         if extract_image_block_types and extract_image_block_types.strip():
