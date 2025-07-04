@@ -84,7 +84,7 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({
           {isDragActive ? (
             <p className="text-center text-primary">Drop the files here ...</p>
           ) : (
-            <p className="text-center text-muted-foreground">Drag 'n' drop files here, or click to select files</p>
+            <p className="text-center text-muted-foreground">Drag &apos;n&apos; drop files here, or click to select files</p>
           )}
         </div>
 
