@@ -47,14 +47,42 @@ export default function Home() {
   };
 
   // Handlers for ProcessingFlowCanvas
-  const handleFlowExecutionResult = (result: any) => {
-    setProcessedData(result);
+  const handleFlowExecutionResult = (result: any | null) => {
+    if (!result) {
+      setProcessedData(null);
+      setProcessingError(null);
+      return;
+    }
+
+    if (Array.isArray(result.processed_elements)) {
+      setProcessedData({ elements: result.processed_elements });
+    } else if (Array.isArray(result.elements)) {
+      setProcessedData({ elements: result.elements });
+    } else if (result.message) {
+      setProcessedData({
+        elements: [
+          {
+            type: "Info",
+            text: result.message,
+            metadata: {
+              filename: result.received_filename || "Flow Output",
+            },
+          },
+        ],
+      });
+    } else {
+      setProcessedData(null);
+    }
+
     setProcessingError(null);
   };
 
-  const handleFlowExecutionError = (error: string) => {
-    setProcessingError(error);
-    setProcessedData(null);
+  const handleFlowExecutionError = (error: string | null) => {
+    const normalizedError = error && error.trim() ? error : null;
+    setProcessingError(normalizedError);
+    if (normalizedError) {
+      setProcessedData(null);
+    }
   };
 
   const handleConfigurationChange = (newConfig: ProcessingConfig) => {
@@ -75,24 +103,6 @@ export default function Home() {
     setFileToPreview(null);
   };
   
-  // Callback for when flow execution is successful
-  const handleFlowResult = (result: any) => {
-    if (result && result.processed_elements) {
-      setProcessedData({ elements: result.processed_elements }); // Ensure structure matches ResultDisplay
-    } else if (result && result.message) { // If no elements, but a message (e.g. input->output)
-       setProcessedData({ elements: [{ type: "Info", text: result.message, metadata: { filename: result.received_filename || "" }}] });
-    } else {
-      setProcessedData(null); // Or some other indication of no elements
-    }
-    setProcessingError(null);
-  };
-
-  // Callback for when flow execution fails
-  const handleFlowError = (error: string) => {
-    setProcessingError(error);
-    setProcessedData(null);
-  };
-
   const handleProcessDocuments = async () => {
     if (selectedDocs.length === 0) {
       setProcessingError("No documents selected for processing.");
