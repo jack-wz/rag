@@ -16,6 +16,7 @@ import ReactFlow, {
   MarkerType,
   ReactFlowInstance,
   Viewport,
+  NodeMouseHandler,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
@@ -33,7 +34,7 @@ import OutputNode from './nodes/OutputNode';
 
 interface ProcessingFlowCanvasProps {
   selectedFile: File | null; // Prop to receive the selected file
-  onFlowExecutionResult: (result: any) => void; // Callback for success
+  onFlowExecutionResult: (result: unknown) => void; // Callback for success
   onFlowExecutionError: (error: string) => void; // Callback for error
 }
 
@@ -104,7 +105,7 @@ const ProcessingFlowCanvas: React.FC<ProcessingFlowCanvasProps> = ({
   };
 
   const handleNodeDataChange = useCallback(
-    (nodeId: string, newData: any) => {
+    (nodeId: string, newData: Record<string, unknown>) => {
       setNodes((nds) =>
         nds.map((node) =>
           node.id === nodeId

@@ -12,6 +12,47 @@ import OllamaConfigSettings from "@/components/custom/OllamaConfigSettings"; // 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
+interface ProcessedElement {
+  type: string;
+  text: string;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+type ProcessedElementsState = { elements: ProcessedElement[] } | null;
+
+const isProcessedElementArray = (value: unknown): value is ProcessedElement[] =>
+  Array.isArray(value) &&
+  value.every((item) =>
+    item !== null &&
+    typeof item === "object" &&
+    "type" in item &&
+    "text" in item &&
+    typeof (item as { type: unknown }).type === "string" &&
+    typeof (item as { text: unknown }).text === "string"
+  );
+
+const FORM_DATA_FIELD_MAP: Record<keyof ProcessingConfig, string> = {
+  strategy: "strategy",
+  removeExtraWhitespace: "remove_extra_whitespace",
+  ocrLanguages: "ocr_languages",
+  pdfInferTableStructure: "pdf_infer_table_structure",
+  extractImageBlockTypes: "extract_image_block_types",
+  chunkingStrategy: "chunking_strategy",
+  chunkMaxCharacters: "chunk_max_characters",
+  chunkNewAfterNChars: "chunk_new_after_n_chars",
+  chunkCombineTextUnderNChars: "chunk_combine_text_under_n_chars",
+  chunkOverlap: "chunk_overlap",
+  chunkMultipageSections: "chunk_multipage_sections",
+};
+
+type FlowExecutionResponse = {
+  processed_elements?: unknown;
+  elements?: unknown;
+  message?: string;
+  received_filename?: string;
+};
+
 export default function Home() {
   const [selectedDocs, setSelectedDocs] = useState<File[]>([]);
   const [processingConfig, setProcessingConfig] = useState<ProcessingConfig>({
@@ -30,7 +71,7 @@ export default function Home() {
     chunkOverlap: 0,
     chunkMultipageSections: true, 
   });
-  const [processedData, setProcessedData] = useState<any | null>(null);
+  const [processedData, setProcessedData] = useState<ProcessedElementsState>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false); // For form-based submission
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
@@ -47,8 +88,24 @@ export default function Home() {
   };
 
   // Handlers for ProcessingFlowCanvas
-  const handleFlowExecutionResult = (result: any) => {
-    setProcessedData(result);
+  const handleFlowExecutionResult = (result: FlowExecutionResponse) => {
+    if (isProcessedElementArray(result?.processed_elements)) {
+      setProcessedData({ elements: result.processed_elements });
+    } else if (isProcessedElementArray(result?.elements)) {
+      setProcessedData({ elements: result.elements });
+    } else if (result?.message) {
+      setProcessedData({
+        elements: [
+          {
+            type: "Info",
+            text: result.message,
+            metadata: { filename: result.received_filename || "" },
+          } satisfies ProcessedElement,
+        ],
+      });
+    } else {
+      setProcessedData(null);
+    }
     setProcessingError(null);
   };
 
@@ -75,24 +132,6 @@ export default function Home() {
     setFileToPreview(null);
   };
   
-  // Callback for when flow execution is successful
-  const handleFlowResult = (result: any) => {
-    if (result && result.processed_elements) {
-      setProcessedData({ elements: result.processed_elements }); // Ensure structure matches ResultDisplay
-    } else if (result && result.message) { // If no elements, but a message (e.g. input->output)
-       setProcessedData({ elements: [{ type: "Info", text: result.message, metadata: { filename: result.received_filename || "" }}] });
-    } else {
-      setProcessedData(null); // Or some other indication of no elements
-    }
-    setProcessingError(null);
-  };
-
-  // Callback for when flow execution fails
-  const handleFlowError = (error: string) => {
-    setProcessingError(error);
-    setProcessedData(null);
-  };
-
   const handleProcessDocuments = async () => {
     if (selectedDocs.length === 0) {
       setProcessingError("No documents selected for processing.");
@@ -102,19 +141,20 @@ export default function Home() {
     setProcessedData({ elements: [] }); 
     setProcessingError(null);
 
-    let allProcessedElements: any[] = [];
-    let errors: string[] = [];
+    const aggregatedElements: ProcessedElement[] = [];
+    const errors: string[] = [];
 
     for (const doc of selectedDocs) {
       const formData = new FormData();
       formData.append('file', doc);
       
-      Object.entries(processingConfig).forEach(([key, value]) => {
+      (Object.entries(processingConfig) as [keyof ProcessingConfig, ProcessingConfig[keyof ProcessingConfig]][]).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
+          const formFieldName = FORM_DATA_FIELD_MAP[key] ?? (key as string);
           if (typeof value === 'boolean' || typeof value === 'number') {
-            formData.append(key, String(value));
+            formData.append(formFieldName, String(value));
           } else {
-            formData.append(key, value as string);
+            formData.append(formFieldName, value as string);
           }
         }
       });
@@ -132,15 +172,17 @@ export default function Home() {
         }
 
         const result = await response.json();
-        if (result.elements && Array.isArray(result.elements)) {
-          const elementsWithFilename = result.elements.map((el: any) => ({
-            ...el,
+        if (isProcessedElementArray(result.elements)) {
+          const elementsWithFilename = result.elements.map((element) => ({
+            ...element,
             metadata: {
-              ...el.metadata,
+              ...(element.metadata ?? {}),
               original_filename: doc.name 
             }
           }));
-          allProcessedElements = [...allProcessedElements, ...elementsWithFilename];
+          aggregatedElements.push(...elementsWithFilename);
+        } else {
+          errors.push(`Unexpected response format for ${doc.name}.`);
         }
       } catch (error) {
         console.error(`Processing error for ${doc.name}:`, error);
@@ -148,8 +190,8 @@ export default function Home() {
       }
     }
 
-    if (allProcessedElements.length > 0) {
-      setProcessedData({ elements: allProcessedElements });
+    if (aggregatedElements.length > 0) {
+      setProcessedData({ elements: aggregatedElements });
     } else {
       setProcessedData(null); 
     }
