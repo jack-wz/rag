@@ -15,7 +15,6 @@ import ReactFlow, {
   Position,
   MarkerType,
   ReactFlowInstance,
-  Viewport,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Button } from '@/components/ui/button';
@@ -33,8 +32,8 @@ import OutputNode from './nodes/OutputNode';
 
 interface ProcessingFlowCanvasProps {
   selectedFile: File | null; // Prop to receive the selected file
-  onFlowExecutionResult: (result: any) => void; // Callback for success
-  onFlowExecutionError: (error: string) => void; // Callback for error
+  onFlowExecutionResult: (result: any | null) => void; // Callback for success
+  onFlowExecutionError: (error: string | null) => void; // Callback for error
 }
 
 let idCounter = 0;
@@ -193,7 +192,7 @@ const ProcessingFlowCanvas: React.FC<ProcessingFlowCanvasProps> = ({
 
     setIsExecutingFlow(true);
     onFlowExecutionResult(null); // Clear previous results
-    onFlowExecutionError("");   // Clear previous errors
+    onFlowExecutionError(null);   // Clear previous errors
 
     const serializedNodes = nodes.map(node => ({
       id: node.id,
